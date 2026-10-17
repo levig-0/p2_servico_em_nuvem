@@ -44,7 +44,7 @@ graph TD
     
     LambdaCRUD -->|Persiste e Le| RDS
     LambdaRelatorio -->|SQL JOIN / GROUP BY| RDS
-
+```
 Decisão
 Decidimos utilizar AWS Lambda integradas via Amazon API Gateway para executar o CRUD das entidades.
 
