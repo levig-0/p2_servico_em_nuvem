@@ -1,99 +1,104 @@
 # Especificação do Sistema - Gestão de Biblioteca em Nuvem
 
 ## 1. Descrição do Problema
-Bibliotecas acadêmicas enfrentam problemas para gerenciar seu acervo físico, registrar fotos/capas atualizadas de livros e emitir relatórios gerenciais sobre as categorias de livros mais emprestadas. 
+Bibliotecas acadêmicas têm dificuldade para organizar o acervo por categoria, manter as capas dos livros atualizadas e saber como o acervo está distribuído.
 
-O objetivo deste projeto é disponibilizar um sistema web publicado na AWS para gerenciar livros, leitores e empréstimos, permitindo upload seguro de imagens de capa, processamento automático em nuvem e geração de relatórios consolidados em tempo real no banco de dados relacional.
-
----
+Este projeto disponibiliza um sistema web publicado na AWS para cadastrar categorias e livros, enviar a capa de cada livro de forma segura, processar a capa automaticamente em nuvem e emitir um relatório consolidado a partir do banco relacional.
 
 ## 2. Personas
 
 1. **Ana Maria (Bibliotecária / Admin)**
-   * **Perfil:** Responsável por cadastrar livros no acervo, enviar a foto da capa do livro, registrar empréstimos e emitir relatórios de movimentação.
-   * **Necessidade:** Processo simples para adicionar capas de livros em alta qualidade sem travar o sistema e relatórios resumidos por categoria.
+   * **Perfil:** cadastra categorias e livros, envia a capa e consulta o relatório do acervo.
+   * **Necessidade:** processo simples para manter o acervo organizado e adicionar capas sem travar o sistema, com um relatório resumido por categoria.
 
 2. **Lucas Silva (Estudante / Leitor)**
-   * **Perfil:** Aluno universitário que consulta a biblioteca para empréstimo de materiais.
-   * **Necessidade:** Consultar livros disponíveis com a visualização da capa do exemplar e histórico de empréstimos.
+   * **Perfil:** aluno universitário que consulta o acervo.
+   * **Necessidade:** encontrar livros por categoria e ver a capa de cada exemplar.
 
----
+## 3. Aplicação dos Requisitos ao Domínio de Biblioteca
 
-## 3. Aplicação dos Requisitos Funcionais (RF-01 a RF-05) ao Domínio de Biblioteca
+* **RF-01 (CRUD no Amazon RDS):** CRUD completo de **Categoria** e **Livro** (relação 1:N: uma categoria tem vários livros), persistidos em **Amazon RDS MySQL**.
+* **RF-02 (Upload via URL pré-assinada):** o backend gera uma URL pré-assinada do S3 para que o front-end envie a capa do livro (JPG/PNG) direto ao bucket.
+* **RF-03 (S3 → Lambda → RDS):** quando a capa chega ao bucket, um evento aciona uma Lambda que lê o tamanho, o tipo e a extensão do arquivo e atualiza o registro do livro no RDS (`capa_processada = true`). O resultado fica visível no CloudWatch.
+* **RF-04 (Relatório):** `GET /relatorios/livros-por-categoria`, exposto pelo API Gateway e implementado em Lambda, com `JOIN` entre `categorias` e `livros` e `GROUP BY` por categoria. Retorna o total de livros e de capas processadas por categoria.
+* **RF-05 (Front-end):** interface web em S3 Static Website que consome a API do CRUD (EC2) e o relatório (API Gateway).
 
-* **RF-01 (CRUD no Amazon RDS):** O sistema permitirá o CRUD completo de duas entidades relacionadas (1:N): **Livro** e **Empréstimo**, persistidas em um banco de dados relacional **Amazon RDS (PostgreSQL/MySQL)**.
-* **RF-02 (Upload via Pre-Signed URL no S3):** Para cadastrar a capa de um livro, o backend gera uma **URL pré-assinada do Amazon S3** para que o front-end faça o upload direto do arquivo (imagem/JPG/PNG) sem sobrecarregar o backend.
-* **RF-03 (Processamento Assíncrono via S3 Event Trigger + Lambda):** Assim que a foto da capa é enviada ao S3, um evento dispara uma função **AWS Lambda**, que valida/extrai os metadados do arquivo (ex: tamanho, extensão, dimensões) e atualiza o registro do **Livro no RDS** marcando a capa como "Processada".
-* **RF-04 (Relatório com JOIN/GROUP BY via API Gateway + Lambda):** O sistema exporá a rota `GET /relatorios/emprestimos-por-categoria` integrada ao **API Gateway** e executada por uma **AWS Lambda**, que consulta o RDS fazendo **JOIN** entre as tabelas `Livro` e `Empréstimo` e **GROUP BY** por categoria para retornar estatísticas de uso.
-* **RF-05 (Front-end Web Publicado):** Interface web moderna hospedada em um bucket **S3 Static Website Hosting** consumindo as APIs REST do sistema.
-
----
+Decisões de escopo:
+* Não há autenticação nem controle de empréstimos nesta versão.
+* O CRUD roda em EC2 com Docker (ADR-01 no `design.md`); Lambda é usada em RF-03 e RF-04.
 
 ## 4. Histórias de Usuário e Critérios de Aceite
 
-### US-01: Cadastro de Livro e Geração de Empréstimo (RF-01)
+### US-01: Gerenciar categorias e livros (RF-01)
 * **Como** Bibliotecária (Ana)
-* **Quero** cadastrar um novo livro e registrar empréstimos vinculados a ele no banco relacional
-* **Para que** os dados fiquem salvos permanentemente no Amazon RDS.
+* **Quero** cadastrar, consultar, alterar e excluir categorias e livros
+* **Para que** o acervo fique salvo de forma permanente no Amazon RDS.
 
-#### Critérios de Aceite:
-* **Cenário 1: Cadastro de livro no RDS com sucesso**
-  * **Dado** que estou autenticada como Bibliotecária
-  * **Quando** eu enviar os dados do livro (Título, Autor, Categoria, ISBN)
-  * **Então** o registro deve ser persistido na tabela `livros` no Amazon RDS e retornar o ID gerado.
-* **Cenário 2: Registro de empréstimo (Relacionamento 1:N)**
-  * **Dado** que um livro já existe no acervo do RDS
-  * **Quando** eu vincular um novo empréstimo (Aluno, Data Inicio, Data Prevista) a este livro
-  * **Então** a tabela `emprestimos` deve salvar a chave estrangeira `livro_id` referente ao livro selecionado.
+* **Cenário 1: Cadastrar categoria**
+  * **Dado** que informo o nome de uma categoria nova
+  * **Quando** eu enviar `POST /categorias`
+  * **Então** a categoria é gravada na tabela `categorias` e a API devolve o `id` gerado.
+* **Cenário 2: Cadastrar livro em uma categoria**
+  * **Dado** que a categoria existe
+  * **Quando** eu enviar `POST /livros` com título, autor, ISBN, ano e a categoria
+  * **Então** o livro é gravado em `livros` com a chave estrangeira `categoria_id`.
+* **Cenário 3: Consultar, alterar e excluir livro**
+  * **Dado** que o livro existe
+  * **Quando** eu usar `GET`, `PUT` ou `DELETE` em `/livros/{id}`
+  * **Então** a API devolve, atualiza ou remove o registro, e a consulta direta ao RDS mostra o mesmo resultado.
+* **Cenário 4: Excluir categoria com livros**
+  * **Dado** que a categoria ainda tem livros
+  * **Quando** eu tentar excluí-la
+  * **Então** o banco recusa a exclusão pela chave estrangeira, e a categoria só pode ser removida depois dos seus livros.
 
----
-
-### US-02: Upload da Capa do Livro via Pre-Signed URL (RF-02)
+### US-02: Enviar a capa do livro por URL pré-assinada (RF-02)
 * **Como** Bibliotecária (Ana)
-* **Quero** obter uma URL segura para enviar a imagem da capa do livro direto para o S3
-* **Para que** o backend não precise processar o tráfego do arquivo pesado.
+* **Quero** enviar a capa direto para o S3 por uma URL temporária
+* **Para que** o backend não precise trafegar o arquivo.
 
-#### Critérios de Aceite:
-* **Cenário 1: Solicitação de URL pré-assinada**
-  * **Dado** que estou cadastrando a capa de um livro com ID válido
-  * **Quando** o front-end chamar a rota `POST /livros/{id}/capa-url` informando o tipo do arquivo (`image/jpeg`)
-  * **Então** o backend deve retornar uma Pre-Signed URL com expiração temporária (ex: 5 minutos) liberando a gravação no S3.
+* **Cenário 1: Solicitar a URL**
+  * **Dado** que o livro existe
+  * **Quando** o front-end chamar `POST /livros/{id}/capa-url` informando o tipo do arquivo (`image/jpeg` ou `image/png`)
+  * **Então** o backend devolve uma URL pré-assinada que expira em poucos minutos.
+* **Cenário 2: Enviar o arquivo**
+  * **Dado** que recebi a URL
+  * **Quando** o front-end enviar o arquivo com `PUT` para ela
+  * **Então** o arquivo é gravado no bucket de capas sem passar pela API.
 
----
+### US-03: Processar automaticamente a capa enviada (RF-03)
+* **Como** sistema
+* **Quero** processar toda capa nova do bucket
+* **Para que** os dados do arquivo sejam registrados no banco.
 
-### US-03: Processamento Automático da Imagem de Capa (RF-03)
-* **Como** Sistema de Biblioteca
-* **Quero** processar automaticamente qualquer nova capa enviada ao bucket S3
-* **Para que** os metadados do arquivo sejam salvos no banco de dados RDS.
+* **Cenário 1: Evento dispara a Lambda**
+  * **Dado** que uma capa foi gravada no bucket
+  * **Quando** o evento `s3:ObjectCreated:*` ocorrer
+  * **Então** a Lambda é executada, lê tamanho, tipo e extensão do arquivo e atualiza o livro correspondente no RDS com `capa_processada = true`.
+* **Cenário 2: Evidência**
+  * **Dado** que a Lambda executou
+  * **Quando** eu abrir o grupo de logs dela no CloudWatch
+  * **Então** vejo o registro da execução com o arquivo processado.
 
-#### Critérios de Aceite:
-* **Cenário 1: Disparo da Lambda pós-upload**
-  * **Dado** que uma foto de capa foi salva no bucket S3 via Pre-Signed URL
-  * **Quando** o evento `s3:ObjectCreated:*` for disparado
-  * **Então** a função AWS Lambda deve ser executada, ler a imagem do S3, extrair o tamanho/extensão e atualizar o registro correspondente no Amazon RDS com o link final e status `capa_processada = true`.
-
----
-
-### US-04: Emissão de Relatório de Empréstimos por Categoria (RF-04)
+### US-04: Relatório de livros por categoria (RF-04)
 * **Como** Bibliotecária (Ana)
-* **Quero** visualizar um relatório agregando total de empréstimos por categoria de livro
-* **Para que** eu identifique as áreas do acervo com maior demanda.
+* **Quero** ver quantos livros e quantas capas processadas há em cada categoria
+* **Para que** eu entenda como o acervo está distribuído.
 
-#### Critérios de Aceite:
-* **Cenário 1: Consulta de relatório via API Gateway**
-  * **Dado** que existem empréstimos gravados na base de dados do RDS
-  * **Quando** eu acessar a rota `GET /relatorios/emprestimos-por-categoria`
-  * **Então** o API Gateway deve invocar a Lambda do relatório, que executará uma query SQL com `JOIN` entre `livros` e `emprestimos` agrupando com `GROUP BY categoria` e retornando o JSON com a contagem.
+* **Cenário 1: Consultar o relatório**
+  * **Dado** que existem categorias e livros no RDS
+  * **Quando** eu acessar `GET /relatorios/livros-por-categoria`
+  * **Então** o API Gateway aciona a Lambda, que consulta o RDS com `JOIN` e `GROUP BY categoria` e devolve um JSON com o total de livros e de capas processadas por categoria.
 
----
+### US-05: Interface web (RF-05)
+* **Como** Bibliotecária ou Leitor
+* **Quero** usar o sistema pelo navegador
+* **Para que** eu consulte o acervo, as capas e o relatório sem instalar nada.
 
-### US-05: Interface do Usuário Integrada (RF-05)
-* **Como** Leitor ou Bibliotecária
-* **Quero** acessar a aplicação via navegador web no S3 Static Hosting
-* **Para que** eu possa interagir com o catálogo, capas dos livros e relatórios sem instalar nada localmente.
-
-#### Critérios de Aceite:
-* **Cenário 1: Acesso ao Front-end estático**
-  * **Dado** que navego para a URL do S3 Static Website Hosting
+* **Cenário 1: Acessar o front-end**
+  * **Dado** que abro a URL do S3 Static Website
   * **Quando** a página carregar
-  * **Então** o front-end deve efetuar as requisições HTTP para os endpoints das Lambdas/API Gateway e renderizar os dados do acervo.
+  * **Então** ela lista categorias e livros consumindo a API do CRUD e exibe o relatório consumindo o API Gateway.
+* **Cenário 2: Gerenciar pela interface**
+  * **Dado** que estou na página
+  * **Quando** eu criar, editar ou excluir um livro ou enviar uma capa
+  * **Então** a mudança aparece na lista e fica gravada no RDS.
