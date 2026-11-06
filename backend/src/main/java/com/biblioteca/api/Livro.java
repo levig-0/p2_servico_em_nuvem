@@ -24,6 +24,15 @@ public class Livro {
     @JoinColumn(name = "categoria_id")
     private Categoria categoria;
 
+    @Column(name = "capa_url")
+    private String capaUrl;
+
+    @Column(name = "capa_processada")
+    private Boolean capaProcessada = false;
+
+    @Column(name = "capa_tamanho_bytes")
+    private Integer capaTamanhoBytes;
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -41,4 +50,13 @@ public class Livro {
 
     public Categoria getCategoria() { return categoria; }
     public void setCategoria(Categoria categoria) { this.categoria = categoria; }
+
+    public String getCapaUrl() { return capaUrl; }
+    public void setCapaUrl(String capaUrl) { this.capaUrl = capaUrl; }
+
+    public Boolean getCapaProcessada() { return capaProcessada; }
+    public void setCapaProcessada(Boolean capaProcessada) { this.capaProcessada = capaProcessada; }
+
+    public Integer getCapaTamanhoBytes() { return capaTamanhoBytes; }
+    public void setCapaTamanhoBytes(Integer capaTamanhoBytes) { this.capaTamanhoBytes = capaTamanhoBytes; }
 }

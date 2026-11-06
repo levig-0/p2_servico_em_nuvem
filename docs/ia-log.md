@@ -130,5 +130,39 @@ Claude. Revisão do `design.md` gerado na Entrada 01 e do trecho do ADR contra a
 * **Aprendizado:** a saída da IA precisa ser conferida contra o que realmente roda, porque o professor avalia a coerência entre documentação, implementação e demonstração.
 
 
-## Reflexão final
-*(a preencher até a entrega de 06/11)*
+## Entrada 07 - [06/11/2026]
+
+### Contexto/Objetivo
+Finalização da implementação de todos os requisitos pendentes (RF-02, RF-03, RF-04, RF-05, RNF-03 e RNF-05) para a entrega final do Projeto 2.
+
+### Ferramenta e prompt (resumo)
+Assistente de IA Antigravity. Pedido de geração do serviço S3 para Pre-signed URLs no Spring Boot, funções Lambda em Python para o evento S3 e o relatório analítico com JOIN/GROUP BY, refatoração dinâmica do frontend com `config.js` e elaboração do guia passo a passo de infraestrutura sem IaC no `README.md`.
+
+### O que a IA Gerou
+* Código Java com AWS SDK v2 (`S3Service` e endpoint em `LivroController`) para gerar URLs pré-assinadas com segurança na EC2 (`LabInstanceProfile`).
+* Migração SQL (`sql/003_add_capa_columns.sql`) e campos correspondentes na entidade JPA `Livro`.
+* Funções Lambda Python: `lambdas/processa_capa/lambda_function.py` (processamento de evento S3 com logs CloudWatch) e `lambdas/relatorio/lambda_function.py` (agregação SQL com suporte a CORS para API Gateway).
+* Refatoração do `index.html` e criação do `config.js` desacoplado para isolar os endpoints dinâmicos da AWS.
+* Guia detalhado passo a passo de provisionamento no `README.md` e checklist de evidências em `docs/evidencias/`.
+
+### O que o Grupo Aceitou / Rejeitou / Corrigiu
+* **Aceito:** Adoção de Python para as funções Serverless (Lambdas), garantindo execução rápida, baixo consumo de memória e facilidade de deploy em relação a Java.
+* **Aceito:** Separação do arquivo `config.js` para atender ao RNF-03, permitindo rodar a aplicação em qualquer nova sessão do Learner Lab apenas trocando o IP da EC2 em uma única linha.
+* **Corrigido:** A primeira sugestão de credenciais utilizava chaves estáticas da AWS. Corrigido para utilizar o provedor padrão de credenciais da AWS SDK (`DefaultCredentialsProvider`), aproveitando a `LabInstanceProfile` vinculada à EC2 sem necessidade de expor chaves no repositório (RNF-02).
+* **Validado:** Compilação do backend Java via Maven finalizada com sucesso gerando o pacote `api-0.0.1-SNAPSHOT.jar`.
+
+
+## Reflexão Final sobre o Uso de IA no Projeto
+
+O desenvolvimento deste projeto utilizando assistentes de Inteligência Artificial evidenciou aspectos cruciais sobre engenharia de software e arquitetura em nuvem:
+
+1. **A IA como Aceleradora, mas com Necessidade de Validação Crítica:**
+   Nas primeiras iterações (Entrada 01), a IA sugeriu arquiteturas genéricas (CRUD inteiro em Lambda com Spring Boot, banco PostgreSQL, tabelas de empréstimos e roles IAM customizadas). Se o grupo tivesse aceitado cegamente, o projeto teria falhado nas restrições reais do **AWS Learner Lab** (onde não é permitido criar roles IAM customizadas, o cold start do Spring Boot em Lambda torna a experiência inaceitável e o orçamento é limitado). A intervenção humana e a tomada de decisão consciente (documentada no ADR-01) foram determinantes para o sucesso.
+
+2. **A Importância da Especificação Rigorosa:**
+   A prática de construir `specs/spec.md`, `specs/design.md` e `specs/tasks.md` antes de gerar código serviu como a melhor âncora de contexto para a IA. Quando as histórias de usuário e os critérios de aceite (cenários BDD) estavam claros, o código gerado pela IA (seja o Java com JPA ou as Lambdas em Python) foi muito mais assertivo, limpo e diretamente integrado ao ecossistema proposto.
+
+3. **Arquitetura Híbrida e Flexibilidade:**
+   A combinação de container Docker em EC2 para o CRUD relacional contínuo e Serverless (S3 + Lambda + API Gateway) para eventos e relatórios analíticos demonstrou o verdadeiro potencial de uma solução em nuvem balanceada: resiliente, econômica para o Learner Lab e fácil de manter.
+
+Conclusão: A IA é um excelente copiloto de desenvolvimento e documentação, mas a responsabilidade técnica, a conferência com a infraestrutura real e o domínio das decisões de arquitetura cabem integralmente aos desenvolvedores.

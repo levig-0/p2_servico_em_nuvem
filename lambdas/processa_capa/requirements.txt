@@ -1,0 +1,4 @@
+# Dependências da Lambda de processamento de capas
+# No ambiente AWS Lambda (Python 3.12), empacote com:
+# pip install pymysql -t .
+pymysql>=1.1.0

@@ -3,14 +3,36 @@ package com.biblioteca.api;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/livros")
 @CrossOrigin(origins = "*")
 public class LivroController {
     private final LivroRepository repo;
+    private final S3Service s3Service;
 
-    public LivroController(LivroRepository repo) { this.repo = repo; }
+    public LivroController(LivroRepository repo, S3Service s3Service) {
+        this.repo = repo;
+        this.s3Service = s3Service;
+    }
+
+    @PostMapping("/{id}/capa-url")
+    public ResponseEntity<Map<String, String>> gerarUrlCapa(
+            @PathVariable Integer id,
+            @RequestBody(required = false) Map<String, String> body) {
+        if (!repo.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String contentType = "image/jpeg";
+        if (body != null && body.containsKey("contentType") && body.get("contentType") != null) {
+            contentType = body.get("contentType");
+        }
+
+        Map<String, String> resposta = s3Service.gerarPresignedUrlUpload(id, contentType);
+        return ResponseEntity.ok(resposta);
+    }
 
     @GetMapping
     public List<Livro> listar() { return repo.findAll(); }

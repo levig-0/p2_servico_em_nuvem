@@ -1,1 +1,9 @@
 .env
+*.class
+target/
+.idea/
+*.iml
+.vscode/
+*.DS_Store
+lambdas/*.zip
+

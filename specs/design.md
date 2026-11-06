@@ -55,27 +55,32 @@ erDiagram
     int ano_publicacao
     int categoria_id FK
     timestamp criado_em
+    varchar capa_url
+    boolean capa_processada
+    int capa_tamanho_bytes
   }
 ```
 
-Relação 1:N: uma categoria tem vários livros. A chave estrangeira impede excluir uma categoria que ainda tenha livros. Scripts versionados em `sql/001_schema.sql` (tabelas) e `sql/002_schema.sql` (dados de exemplo).
+Relação 1:N: uma categoria tem vários livros. A chave estrangeira impede excluir uma categoria que ainda tenha livros. Scripts versionados em `sql/001_schema.sql` (tabelas), `sql/002_schema.sql` (dados de exemplo) e `sql/003_add_capa_columns.sql` (campos de capa).
 
 ## 3. Rotas da API
 
-| Método | Rota | Descrição |
-|---|---|---|
-| GET | `/categorias` | Lista categorias |
-| GET | `/categorias/{id}` | Busca uma categoria |
-| POST | `/categorias` | Cria categoria |
-| PUT | `/categorias/{id}` | Atualiza categoria |
-| DELETE | `/categorias/{id}` | Exclui categoria |
-| GET | `/livros` | Lista livros (com a categoria) |
-| GET | `/livros/{id}` | Busca um livro |
-| POST | `/livros` | Cria livro (`categoria: {id}`) |
-| PUT | `/livros/{id}` | Atualiza livro |
-| DELETE | `/livros/{id}` | Exclui livro |
+| Método | Rota | Serviço | Descrição |
+|---|---|---|---|
+| GET | `/categorias` | EC2 (Spring Boot) | Lista categorias |
+| GET | `/categorias/{id}` | EC2 (Spring Boot) | Busca uma categoria |
+| POST | `/categorias` | EC2 (Spring Boot) | Cria categoria |
+| PUT | `/categorias/{id}` | EC2 (Spring Boot) | Atualiza categoria |
+| DELETE | `/categorias/{id}` | EC2 (Spring Boot) | Exclui categoria |
+| GET | `/livros` | EC2 (Spring Boot) | Lista livros (com categoria e status da capa) |
+| GET | `/livros/{id}` | EC2 (Spring Boot) | Busca um livro |
+| POST | `/livros` | EC2 (Spring Boot) | Cria livro (`categoria: {id}`) |
+| PUT | `/livros/{id}` | EC2 (Spring Boot) | Atualiza livro |
+| DELETE | `/livros/{id}` | EC2 (Spring Boot) | Exclui livro |
+| POST | `/livros/{id}/capa-url` | EC2 (Spring Boot) | Gera URL pré-assinada de upload para o S3 (RF-02) |
+| GET | `/relatorios/livros-por-categoria` | API Gateway + Lambda | Relatório analítico com JOIN e GROUP BY (RF-04) |
 
-CORS liberado na API (`@CrossOrigin`). As credenciais do banco são lidas somente de variáveis de ambiente (`DB_HOST`, `DB_USER`, `DB_NAME`, `DB_PASSWORD`).
+CORS liberado na API (`@CrossOrigin`) e no API Gateway. As credenciais do banco são lidas somente de variáveis de ambiente (`DB_HOST`, `DB_USER`, `DB_NAME`, `DB_PASSWORD`).
 
 ## 4. Security Groups (na `projeto02-vpc`)
 
@@ -112,14 +117,16 @@ A regra de saída de ambos é a padrão (todo o tráfego).
 - **Consequência:** reduz a superfície de ataque, ao custo de só poder ser administrado a partir de uma máquina dentro da VPC (a EC2).
 
 ## 6. Estado da implementação
-
+ 
 | Item | Estado |
 |---|---|
-| RF-01 CRUD de 2 entidades no RDS | Em funcionamento na AWS |
-| RNF-01 RDS privado e Security Groups documentados | Atendido |
-| RNF-02 Sem senhas no repositório | Atendido |
-| RNF-04 ADR | Atendido (ADR-01) |
-| RF-02 Upload via URL pré-assinada | Previsto |
-| RF-03 S3 → Lambda → RDS | Previsto |
-| RF-04 Relatório (API Gateway + Lambda) | Previsto |
-| RF-05 Front-end consumindo a API | Em andamento (landing page estática publicada no S3; ainda não consome a API) |
+| RF-01 CRUD de 2 entidades no RDS | Atendido (Spring Boot na EC2 + RDS MySQL privado) |
+| RF-02 Upload via URL pré-assinada | Atendido (`POST /livros/{id}/capa-url` via AWS SDK S3) |
+| RF-03 S3 → Lambda → RDS | Atendido (Lambda Python em subnet privada + CloudWatch) |
+| RF-04 Relatório (API Gateway + Lambda) | Atendido (`GET /relatorios/livros-por-categoria` com JOIN/GROUP BY) |
+| RF-05 Front-end consumindo a API | Atendido (S3 Static Website consumindo EC2 e API Gateway dinamicamente) |
+| RNF-01 RDS privado e Security Groups documentados | Atendido (`app-sg`, `rds-sg`, `lambda-sg`) |
+| RNF-02 Sem senhas no repositório | Atendido (variáveis de ambiente e `.gitignore`) |
+| RNF-03 Sistema volta a funcionar sem IP fixo | Atendido (configuração desacoplada em `config.js`) |
+| RNF-04 ADR | Atendido (ADR-01: EC2 + Docker para CRUD, Lambda para eventos e relatórios) |
+| RNF-05 Infraestrutura sem IaC documentada | Atendido (guia passo a passo completo no `README.md`) |
