@@ -61,7 +61,7 @@ def lambda_handler(event, context):
         return {
             "statusCode": 200,
             "headers": headers,
-            "body": json.dumps(relatorio, ensure_ascii=False)
+            "body": json.dumps(relatorio, default=int)
         }
 
     except Exception as e:
